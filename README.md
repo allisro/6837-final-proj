@@ -1,4 +1,4 @@
-Final project for 6.837 Computer Graphics Fall 2020
+## Final project for 6.837 Computer Graphics Fall 2020
 
 Topic: Texture Synthesis through Image Quilting
 
