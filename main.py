@@ -6,14 +6,21 @@ import TextureApp
 '''
 Main driver, takes in sample image file, output image file, and block size of patch
 '''
-def main():
+if __name__ == "__main__":
     args = sys.argv[1:]
-    if (args < 3):
-        print("Not enough arguments \n SAMPLE_IMAGE OUTPUT_IMAGE BLOCK_SIZE needed")
-        return -1
+    if (len(args) < 5):
+        sys.exit("Not enough arguments \n SAMPLE_IMAGE OUTPUT_TEXTURE WIDTH HEIGHT BLOCK_SIZE needed")
 
-    texture = TextureApp.synthesis(Image.open(args[0]), Image.open(args[1]), args[2])
+    sample_image = Image.open(args[0])
+    output_texture = args[1]
+    output_width = int(args[2])
+    output_height = int(args[3])
+    block_size = int(args[4])
 
-    return texture
+    if (block_size <= 0):
+        sys.exit("Invalid block size")
 
-main()
+    texture = TextureApp.synthesis(sample_image, output_width, output_height, block_size) # texture an image
+    texture.save(output_texture)
+    
+
