@@ -3,6 +3,7 @@ import random
 from itertools import product
 from PIL import Image
 from skimage import io, util
+import heapq
 
 def precompute_blocks(sample_image, block_size):
     h, w, _ = sample_image.shape
@@ -33,6 +34,7 @@ def synthesis(image_file, block_size, num_blocks):
 
             else:
                 patch = findBestPatch(sample_image, res, blocks, overlap, block_size, i, j)
+                patch = findMinPath(patch, res, overlap, block_size, i, j)
 
             res[i:i+block_size, j:j+block_size] = patch
 
@@ -58,7 +60,7 @@ def findBestPatch(sample_image, res, blocks, overlap, block_size, i, j):
             corner = block[:overlap, :overlap] - res[i:i+overlap, j:j+overlap]
             error -= np.sum(corner**2)
         #errors[i, j] = error
-        errors.append(error)
+        errors.append((error)**0.5)
 
     min_error = min(errors)
     candidates = list(filter(lambda x: x <= min_error+tolerance*min_error, errors))
@@ -66,5 +68,72 @@ def findBestPatch(sample_image, res, blocks, overlap, block_size, i, j):
 
     return blocks[ind]
 
+def findMinPath(patch, res, overlap, block_size, i ,j):
+    patch = patch.copy()
+    minCut = np.zeros_like(patch, dtype=bool)
+    dy, dx, _ = patch.shape
+    if j > 0:
+        left = patch[:, :overlap] - res[i:i+dy, j:j+overlap]
+        leftL2 = np.sum(left**2, axis=2)
+        for y, x in enumerate(minCutPath(leftL2)):
+            minCut[y, :x] = True
+    if i > 0:
+        up = patch[:overlap, :] - res[i:i+overlap, j:j+dx]
+        upL2 = np.sum((up**2)**0.5, axis=2)
+        for x, y in enumerate(minCutPath(upL2.T)):
+            minCut[:y, x] = True
 
+    np.copyto(patch, res[i:i+dy, j:j+dx], where=minCut)
 
+    return patch
+
+def minCutPath(errors):
+    # dynamic programming, unused
+    errors = np.pad(errors, [(0, 0), (1, 1)], 
+                    mode='constant', 
+                    constant_values=np.inf)
+
+    cumError = errors[0].copy()
+    paths = np.zeros_like(errors, dtype=int)    
+
+    for i in range(1, len(errors)):
+        M = cumError
+        L = np.roll(M, 1)
+        R = np.roll(M, -1)
+
+        # optimize with np.choose?
+        cumError = np.min((L, M, R), axis=0) + errors[i]
+        paths[i] = np.argmin((L, M, R), axis=0)
+    
+    paths -= 1
+    
+    minCutPath = [np.argmin(cumError)]
+    for i in reversed(range(1, len(errors))):
+        minCutPath.append(minCutPath[-1] + paths[i][minCutPath[-1]])
+    
+    return map(lambda x: x - 1, reversed(minCutPath))
+
+# def minCutPath(errors):
+#     # dijkstra's algorithm vertical
+#     pq = [(error, [i]) for i, error in enumerate(errors[0])]
+#     heapq.heapify(pq)
+
+#     h, w = errors.shape
+#     seen = set()
+
+#     while pq:
+#         error, path = heapq.heappop(pq)
+#         curDepth = len(path)
+#         curIndex = path[-1]
+
+#         if curDepth == h:
+#             return path
+
+#         for delta in -1, 0, 1:
+#             nextIndex = curIndex + delta
+
+#             if 0 <= nextIndex < w:
+#                 if (curDepth, nextIndex) not in seen:
+#                     cumError = error + errors[curDepth, nextIndex]
+#                     heapq.heappush(pq, (cumError, path + [nextIndex]))
+#                     seen.add((curDepth, nextIndex))
