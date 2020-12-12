@@ -3,7 +3,11 @@ import random
 from itertools import product
 from PIL import Image
 from skimage import io, util
-import heapq
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import videofig
+
+animation = []
 
 def precompute_blocks(sample_image, block_size):
     h, w, _ = sample_image.shape
@@ -13,7 +17,7 @@ def precompute_blocks(sample_image, block_size):
         blocks.append(block)
     return blocks
 
-def synthesis(image_file, block_size, num_blocks):
+def synthesis(image_file, block_size, num_blocks, sequence=False):
     sample_image = Image.open(image_file)
     sample_image = util.img_as_float(sample_image)
     overlap = int(block_size/6)
@@ -33,18 +37,24 @@ def synthesis(image_file, block_size, num_blocks):
                 patch = random.choice(blocks)
 
             else:
+                #patch = random.choice(blocks)
                 patch = findBestPatch(sample_image, res, blocks, overlap, block_size, i, j)
                 patch = findMinPath(patch, res, overlap, block_size, i, j)
 
             res[i:i+block_size, j:j+block_size] = patch
+            if sequence:
+                # io.imshow(res)
+                # io.show()
+                animation.append(Image.fromarray((res * 255).astype(np.uint8)))
 
     output_image = Image.fromarray((res * 255).astype(np.uint8))
+    #redraw_fn.initialized = False
+
+    #videofig.videofig(len(animation), redraw_fn, play_fps=60)
     return output_image
 
 
 def findBestPatch(sample_image, res, blocks, overlap, block_size, i, j):
-    #h, w, _ = sample_image.shape
-    #errors = np.zeros((h - block_size, w - block_size))
     errors = []
     tolerance = 0.1
     
@@ -53,13 +63,12 @@ def findBestPatch(sample_image, res, blocks, overlap, block_size, i, j):
         if j > 0: # left
             left = block[:, :overlap] - res[i:i+block_size, j:j+overlap]
             error += np.sum(left**2)
-        if i > 0: # right
+        if i > 0: # up
             up = block[:overlap, :] - res[i:i+overlap, j:j+block_size]
             error += np.sum(up**2)
         if j > 0 and i > 0: # need to get rid of corner once since calc twice
             corner = block[:overlap, :overlap] - res[i:i+overlap, j:j+overlap]
             error -= np.sum(corner**2)
-        #errors[i, j] = error
         errors.append((error)**0.5)
 
     min_error = min(errors)
@@ -113,27 +122,12 @@ def minCutPath(errors):
     
     return map(lambda x: x - 1, reversed(minCutPath))
 
-# def minCutPath(errors):
-#     # dijkstra's algorithm vertical
-#     pq = [(error, [i]) for i, error in enumerate(errors[0])]
-#     heapq.heapify(pq)
 
-#     h, w = errors.shape
-#     seen = set()
+def redraw_fn(f, axes):
+    img = animation[f]
+    if not redraw_fn.initialized:
+        redraw_fn.im = axes.imshow(img, animated=True)
+        redraw_fn.initialized = True
+    else:
+        redraw_fn.im.set_array(img)
 
-#     while pq:
-#         error, path = heapq.heappop(pq)
-#         curDepth = len(path)
-#         curIndex = path[-1]
-
-#         if curDepth == h:
-#             return path
-
-#         for delta in -1, 0, 1:
-#             nextIndex = curIndex + delta
-
-#             if 0 <= nextIndex < w:
-#                 if (curDepth, nextIndex) not in seen:
-#                     cumError = error + errors[curDepth, nextIndex]
-#                     heapq.heappush(pq, (cumError, path + [nextIndex]))
-#                     seen.add((curDepth, nextIndex))

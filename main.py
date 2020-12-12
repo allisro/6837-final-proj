@@ -3,6 +3,7 @@ from PIL import Image
 import argparse
 import os
 import TextureApp
+from skimage import io, util
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--image_path", required=True, type=str, help="path of image you want to quilt")
